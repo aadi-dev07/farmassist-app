@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,14 @@ const AIChatbot: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the most recent message
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -40,6 +48,7 @@ const AIChatbot: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log("Sending message to n8n:", input);
       const response = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: {
@@ -51,11 +60,29 @@ const AIChatbot: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response from FarmAssist AI');
+        throw new Error(`Failed to get response from FarmAssist AI: ${response.status}`);
       }
 
       const data = await response.json();
-      const botResponse = data.response || "I apologize, but I'm having trouble understanding. Could you rephrase your question about farming?";
+      console.log("Response from n8n:", data);
+      
+      // Check if we got a valid response or the fallback message
+      let botResponse = "";
+      
+      if (data && data.response) {
+        botResponse = data.response;
+      } else if (data && typeof data === 'object') {
+        // Try to find any relevant text in the response object
+        botResponse = JSON.stringify(data);
+      } else {
+        botResponse = "I apologize, but I'm having trouble connecting to the farming knowledge base. Please try again later.";
+      }
+
+      // If we still have the fallback message, it means the n8n webhook might not be 
+      // returning the expected format
+      if (botResponse === "I apologize, but I'm having trouble understanding. Could you rephrase your question about farming?") {
+        console.warn("Received fallback message from n8n webhook");
+      }
 
       const botMessage: Message = {
         text: botResponse,
@@ -149,6 +176,7 @@ const AIChatbot: React.FC = () => {
                     </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
               <div className="border-t p-4 flex space-x-2">
                 <Input
