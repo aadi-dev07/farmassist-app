@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, User, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, User, AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,11 +27,16 @@ const AIChatbot: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -50,15 +55,15 @@ const AIChatbot: React.FC = () => {
 
     try {
       console.log('Sending message to chat-assistant function:', input);
-      const { data, error } = await supabase.functions.invoke('chat-assistant', {
+      const { data, error: functionError } = await supabase.functions.invoke('chat-assistant', {
         body: { message: input }
       });
 
-      console.log('Response received:', data, 'Error:', error);
+      console.log('Response received:', data, 'Error:', functionError);
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(`Function error: ${error.message}`);
+      if (functionError) {
+        console.error('Supabase function error:', functionError);
+        throw new Error(`Function error: ${functionError.message || 'Unknown error'}`);
       }
 
       if (!data || !data.response) {
@@ -73,6 +78,7 @@ const AIChatbot: React.FC = () => {
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
+      scrollToBottom();
     } catch (error) {
       console.error('Error details:', error);
       setError('Failed to get response from AI assistant. Please try again.');
@@ -92,6 +98,15 @@ const AIChatbot: React.FC = () => {
     }
   };
 
+  const handleRetry = () => {
+    setError(null);
+    // Find the last user message and resend it
+    const lastUserMessage = [...messages].reverse().find(msg => msg.sender === 'user');
+    if (lastUserMessage) {
+      setInput(lastUserMessage.text);
+    }
+  };
+
   return (
     <section id="chatbot" className="py-16 md:py-24 bg-farm-green-100">
       <div className="container px-4 md:px-6">
@@ -106,9 +121,19 @@ const AIChatbot: React.FC = () => {
 
         <div className="max-w-3xl mx-auto">
           {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="mb-4 flex justify-between items-center">
+              <div className="flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                <AlertDescription>{error}</AlertDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetry}
+                className="ml-2 flex items-center"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" /> Retry
+              </Button>
             </Alert>
           )}
           
@@ -120,7 +145,10 @@ const AIChatbot: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="h-[400px] overflow-y-auto p-4 flex flex-col space-y-4">
+              <div 
+                ref={chatContainerRef}
+                className="h-[400px] overflow-y-auto p-4 flex flex-col space-y-4"
+              >
                 {messages.map((message, index) => (
                   <div
                     key={index}

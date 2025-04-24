@@ -50,101 +50,69 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(apiKey)
     console.log("Initialized Google Generative AI client")
     
-    // First try direct content generation instead of chat
+    // Create model instance
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    console.log("Created model instance with gemini-pro")
+    
+    // The agricultural system prompt
+    const systemPrompt = `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts.`
+    
+    // Create a chat session
     try {
-      console.log("Attempting direct content generation with gemini-1.0-pro")
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.0-pro"
-      })
+      console.log("Starting chat session")
+      const chat = model.startChat({
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.8,
+          topK: 40,
+        },
+      });
       
-      const result = await model.generateContent(
-        [
-          {
-            role: "user",
-            parts: [
-              { text: "You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts. The user asks: " + message }
-            ]
-          }
-        ]
-      )
+      console.log("Sending message to chat session")
+      const result = await chat.sendMessage(
+        `${systemPrompt}\n\nUser message: ${message}`
+      );
       
-      console.log("Received direct generation response")
-      const response = await result.response
-      const text = response.text()
-      console.log("Response text sample:", text.substring(0, 100) + "...")
-
+      const response = await result.response;
+      const text = response.text();
+      console.log("Received response from model, length:", text.length);
+      
       return new Response(
         JSON.stringify({ response: text }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       )
-    } catch (directGenError) {
-      console.error("Direct generation error:", directGenError.message, directGenError.stack)
-      console.log("Falling back to chat model...")
+    } catch (error) {
+      console.error("Chat session error:", error.message)
       
+      // Try direct content generation as fallback
       try {
-        // Try the chat model as a fallback
-        const chatModel = genAI.getGenerativeModel({ 
-          model: "gemini-pro",  // Try the original model name
-          systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts.`
-        })
+        console.log("Attempting direct content generation as fallback")
+        const prompt = `${systemPrompt}\n\nAs FarmAssist, please respond to the following question or request from a user: ${message}`;
         
-        console.log("Starting simple chat with gemini-pro model")
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        console.log("Fallback response received, length:", text.length);
         
-        const result = await chatModel.generateContent(
-          [
-            {
-              role: "user",
-              parts: [{ text: message }]
-            }
-          ]
-        )
-        
-        const response = await result.response
-        const text = response.text()
-        console.log("Chat response text sample:", text.substring(0, 100) + "...")
-  
         return new Response(
           JSON.stringify({ response: text }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           },
         )
-      } catch (chatError) {
-        console.error("Chat model error:", chatError.message, chatError.stack)
-        
-        // Final fallback using the generative model without special parameters
-        try {
-          console.log("Attempting basic fallback with gemini-1.0-pro-latest")
-          const fallbackModel = genAI.getGenerativeModel({ 
-            model: "gemini-1.0-pro-latest",
-          })
-          
-          const prompt = `Answer as FarmAssist, an AI agricultural assistant. Be helpful and provide farming advice. Question: ${message}`
-          
-          const fallbackResult = await fallbackModel.generateContent(prompt)
-          const fallbackText = await fallbackResult.response.text()
-          console.log("Basic fallback response sample:", fallbackText.substring(0, 100) + "...")
-          
-          return new Response(
-            JSON.stringify({ response: fallbackText }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            },
-          )
-        } catch (finalError) {
-          console.error("All attempts failed. Final error:", finalError.message)
-          throw finalError // Pass to the outer catch block
-        }
+      } catch (fallbackError) {
+        console.error("Fallback attempt failed:", fallbackError.message)
+        throw fallbackError;
       }
     }
   } catch (error) {
     console.error('Critical error:', error.message, error.stack)
     return new Response(
       JSON.stringify({ 
-        error: error.message,
-        details: "An error occurred while processing your request. Please try again later."
+        error: "An error occurred while processing your request",
+        details: error.message
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
