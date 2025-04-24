@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,12 @@ const AIChatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -39,11 +46,22 @@ const AIChatbot: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('Sending message to chat-assistant function');
       const { data, error } = await supabase.functions.invoke('chat-assistant', {
         body: { message: input }
       });
 
-      if (error) throw error;
+      console.log('Response received:', data, 'Error:', error);
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(`Function error: ${error.message}`);
+      }
+
+      if (!data || !data.response) {
+        console.error('Invalid response format:', data);
+        throw new Error('Invalid response from AI assistant');
+      }
 
       const botMessage: Message = {
         text: data.response,
@@ -53,7 +71,7 @@ const AIChatbot: React.FC = () => {
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error details:', error);
       toast({
         title: "Error",
         description: "Failed to get response from AI assistant. Please try again.",
@@ -116,7 +134,7 @@ const AIChatbot: React.FC = () => {
                           {message.sender === 'user' ? 'You' : 'FarmAssist AI'}
                         </span>
                       </div>
-                      <p>{message.text}</p>
+                      <p className="whitespace-pre-line">{message.text}</p>
                       <p className="text-xs opacity-70 text-right mt-1">
                         {message.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
@@ -137,6 +155,7 @@ const AIChatbot: React.FC = () => {
                     </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
               <div className="border-t p-4 flex space-x-2">
                 <Input

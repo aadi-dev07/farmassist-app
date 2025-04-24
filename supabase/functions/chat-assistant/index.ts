@@ -17,7 +17,7 @@ serve(async (req) => {
     const { message } = await req.json()
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
     
-    // Use Gemini Pro 1.5 
+    // Make sure we're using the correct model name - Gemini Pro is available, not Pro 1.5
     const model = genAI.getGenerativeModel({ 
       model: "gemini-pro",
       systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include:​
@@ -48,9 +48,12 @@ Real-Time Alerts: Inform users about local disease outbreaks and weather changes
       },
     })
 
+    console.log("Sending message to Gemini API:", message)
     const result = await chat.sendMessage(message)
+    console.log("Received response from Gemini API")
     const response = await result.response
     const text = response.text()
+    console.log("Response text:", text.substring(0, 100) + "...")
 
     return new Response(
       JSON.stringify({ response: text }),
@@ -59,7 +62,7 @@ Real-Time Alerts: Inform users about local disease outbreaks and weather changes
       },
     )
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error:', error.message, error.stack)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
