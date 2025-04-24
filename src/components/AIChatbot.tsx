@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Send, User } from 'lucide-react';
 import { toast } from '@/components/ui/sonner';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   text: string;
@@ -26,7 +26,6 @@ const AIChatbot: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to the most recent message
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -36,7 +35,6 @@ const AIChatbot: React.FC = () => {
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    // Add user message
     const userMessage: Message = {
       text: input,
       sender: 'user',
@@ -66,22 +64,25 @@ const AIChatbot: React.FC = () => {
       const data = await response.json();
       console.log("Response from n8n:", data);
       
-      // Check if we got a valid response or the fallback message
       let botResponse = "";
       
-      if (data && data.response) {
-        botResponse = data.response;
-      } else if (data && typeof data === 'object') {
-        // Try to find any relevant text in the response object
-        botResponse = JSON.stringify(data);
-      } else {
-        botResponse = "I apologize, but I'm having trouble connecting to the farming knowledge base. Please try again later.";
+      if (data && typeof data === 'object') {
+        const findFirstString = (obj: any): string => {
+          if (typeof obj === 'string') return obj;
+          if (typeof obj === 'object' && obj !== null) {
+            for (const key in obj) {
+              const result = findFirstString(obj[key]);
+              if (result) return result;
+            }
+          }
+          return "";
+        };
+        
+        botResponse = findFirstString(data);
       }
 
-      // If we still have the fallback message, it means the n8n webhook might not be 
-      // returning the expected format
-      if (botResponse === "I apologize, but I'm having trouble understanding. Could you rephrase your question about farming?") {
-        console.warn("Received fallback message from n8n webhook");
+      if (!botResponse) {
+        botResponse = "I apologize, but I'm having trouble connecting to the farming knowledge base. Please try again later.";
       }
 
       const botMessage: Message = {
@@ -93,8 +94,8 @@ const AIChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
       console.error('Error in FarmAssist AI chat:', error);
-      toast("Unable to get a response. Please try again.", {
-        description: "There was an error connecting to FarmAssist AI."
+      toast({
+        description: "Unable to get a response. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -153,9 +154,13 @@ const AIChatbot: React.FC = () => {
                           {message.sender === 'user' ? 'You' : 'FarmAssist AI'}
                         </span>
                       </div>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                        {message.text}
-                      </p>
+                      <div className="text-sm leading-relaxed prose prose-sm max-w-none">
+                        {message.sender === 'user' ? (
+                          <p>{message.text}</p>
+                        ) : (
+                          <ReactMarkdown>{message.text}</ReactMarkdown>
+                        )}
+                      </div>
                       <p className="text-xs opacity-70 text-right mt-2">
                         {message.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
