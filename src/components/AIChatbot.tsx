@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,9 +66,9 @@ const AIChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
       console.error('Error in FarmAssist AI chat:', error);
-      toast({
-        title: "Error",
-        description: "Unable to get a response. Please try again.",
+      // Fixed toast call to match the expected API
+      toast("Unable to get a response. Please try again.", {
+        description: "There was an error connecting to FarmAssist AI.",
         variant: "destructive",
       });
     } finally {
