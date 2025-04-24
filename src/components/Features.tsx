@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { 
-  Plant, 
+  Sprout, 
   MessageSquare, 
   Bell, 
   Users, 
@@ -12,7 +12,7 @@ import {
 const Features: React.FC = () => {
   const features = [
     {
-      icon: <Plant className="h-6 w-6" />,
+      icon: <Sprout className="h-6 w-6" />,
       title: "AI-Powered Disease Detection",
       description: "Upload images of your plant leaves to instantly identify diseases and receive treatment recommendations using our state-of-the-art AI model."
     },

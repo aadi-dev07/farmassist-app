@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Leaf, Plant, MessageSquare, Users } from 'lucide-react';
+import { Leaf, Sprout, MessageSquare, Users } from 'lucide-react';
 
 const Hero: React.FC = () => {
   return (
@@ -32,7 +32,7 @@ const Hero: React.FC = () => {
               <div className="flex flex-col gap-4">
                 <div className="group rounded-xl border bg-background p-6 shadow-sm transition-all hover:shadow-md hover:-translate-y-1">
                   <div className="feature-icon">
-                    <Plant className="h-6 w-6" />
+                    <Sprout className="h-6 w-6" />
                   </div>
                   <h3 className="font-semibold">Disease Detection</h3>
                   <p className="text-sm text-muted-foreground">
