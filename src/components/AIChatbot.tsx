@@ -30,6 +30,7 @@ const AIChatbot: React.FC = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [retryCount, setRetryCount] = useState(0);
   const lastUserMessageRef = useRef<string | null>(null);
+  const maxRetries = 3;
 
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
@@ -105,6 +106,15 @@ const AIChatbot: React.FC = () => {
   };
 
   const handleRetry = async () => {
+    if (retryCount >= maxRetries) {
+      toast({
+        title: "Maximum Retries Reached",
+        description: "Please try a different question or try again later.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setError(null);
     // Increment retry count
     setRetryCount(prev => prev + 1);
@@ -152,8 +162,10 @@ const AIChatbot: React.FC = () => {
                 size="sm" 
                 onClick={handleRetry}
                 className="ml-2 flex items-center"
+                disabled={isLoading || retryCount >= maxRetries}
               >
-                <RefreshCw className="h-4 w-4 mr-1" /> Retry {retryCount > 0 ? `(${retryCount})` : ''}
+                <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} /> 
+                Retry {retryCount > 0 ? `(${retryCount}/${maxRetries})` : ''}
               </Button>
             </Alert>
           )}

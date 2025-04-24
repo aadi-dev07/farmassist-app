@@ -51,21 +51,24 @@ serve(async (req) => {
     console.log("Initialized Google Generative AI client")
     
     // Create model instance - use "gemini-pro" which is the correct model name
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-pro",
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 1024,
+      },
+    })
     console.log("Created model instance with gemini-pro")
     
     // The agricultural system prompt
-    const systemPrompt = `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts.`
+    const systemPrompt = `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts. Provide helpful, accurate information about farming practices, plant care, and sustainable agriculture.`
     
     // Create a chat session
     try {
       console.log("Starting chat session")
       const chat = model.startChat({
-        generationConfig: {
-          temperature: 0.7,
-          topP: 0.8,
-          topK: 40,
-        },
         history: [
           {
             role: "user",
@@ -78,8 +81,11 @@ serve(async (req) => {
         ],
       });
       
-      console.log("Sending message to chat session")
-      const result = await chat.sendMessage(message)
+      // Add system prompt as part of the conversation
+      const systemMessage = `${systemPrompt}\n\nUser's question: ${message}`;
+      
+      console.log("Sending message to chat session:", systemMessage)
+      const result = await chat.sendMessage(systemMessage)
       
       const response = await result.response
       const text = response.text()
@@ -112,7 +118,16 @@ serve(async (req) => {
         )
       } catch (fallbackError) {
         console.error("Fallback attempt failed:", fallbackError.message, fallbackError.stack)
-        throw fallbackError
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to generate response", 
+            details: fallbackError.message
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          },
+        )
       }
     }
   } catch (error) {
