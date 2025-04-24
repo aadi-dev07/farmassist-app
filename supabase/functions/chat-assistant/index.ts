@@ -50,7 +50,7 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(apiKey)
     console.log("Initialized Google Generative AI client")
     
-    // Create model instance
+    // Create model instance - use "gemini-pro" which is the correct model name
     const model = genAI.getGenerativeModel({ model: "gemini-pro" })
     console.log("Created model instance with gemini-pro")
     
@@ -66,16 +66,24 @@ serve(async (req) => {
           topP: 0.8,
           topK: 40,
         },
+        history: [
+          {
+            role: "user",
+            parts: [{ text: "You are FarmAssist, an AI agricultural assistant." }],
+          },
+          {
+            role: "model",
+            parts: [{ text: "I am FarmAssist, your AI agricultural assistant. I'm here to help with plant care, disease diagnosis, farming practices, and gardening advice. How can I assist you today?" }],
+          },
+        ],
       });
       
       console.log("Sending message to chat session")
-      const result = await chat.sendMessage(
-        `${systemPrompt}\n\nUser message: ${message}`
-      );
+      const result = await chat.sendMessage(message)
       
-      const response = await result.response;
-      const text = response.text();
-      console.log("Received response from model, length:", text.length);
+      const response = await result.response
+      const text = response.text()
+      console.log("Received response from model, length:", text.length)
       
       return new Response(
         JSON.stringify({ response: text }),
@@ -84,17 +92,17 @@ serve(async (req) => {
         },
       )
     } catch (error) {
-      console.error("Chat session error:", error.message)
+      console.error("Chat session error:", error.message, error.stack)
       
       // Try direct content generation as fallback
       try {
         console.log("Attempting direct content generation as fallback")
         const prompt = `${systemPrompt}\n\nAs FarmAssist, please respond to the following question or request from a user: ${message}`;
         
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        console.log("Fallback response received, length:", text.length);
+        const result = await model.generateContent(prompt)
+        const response = await result.response
+        const text = response.text()
+        console.log("Fallback response received, length:", text.length)
         
         return new Response(
           JSON.stringify({ response: text }),
@@ -103,8 +111,8 @@ serve(async (req) => {
           },
         )
       } catch (fallbackError) {
-        console.error("Fallback attempt failed:", fallbackError.message)
-        throw fallbackError;
+        console.error("Fallback attempt failed:", fallbackError.message, fallbackError.stack)
+        throw fallbackError
       }
     }
   } catch (error) {

@@ -28,6 +28,8 @@ const AIChatbot: React.FC = () => {
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const lastUserMessageRef = useRef<string | null>(null);
 
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
@@ -41,6 +43,9 @@ const AIChatbot: React.FC = () => {
   const handleSend = async () => {
     if (!input.trim()) return;
     setError(null);
+
+    // Store user message for potential retries
+    lastUserMessageRef.current = input;
 
     // Add user message
     const userMessage: Message = {
@@ -78,6 +83,7 @@ const AIChatbot: React.FC = () => {
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
+      setRetryCount(0); // Reset retry count on success
       scrollToBottom();
     } catch (error) {
       console.error('Error details:', error);
@@ -98,12 +104,27 @@ const AIChatbot: React.FC = () => {
     }
   };
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     setError(null);
-    // Find the last user message and resend it
-    const lastUserMessage = [...messages].reverse().find(msg => msg.sender === 'user');
-    if (lastUserMessage) {
-      setInput(lastUserMessage.text);
+    // Increment retry count
+    setRetryCount(prev => prev + 1);
+    
+    if (lastUserMessageRef.current) {
+      setInput(lastUserMessageRef.current);
+      // Use a small timeout to ensure the UI updates before sending
+      setTimeout(() => {
+        handleSend();
+      }, 100);
+    } else {
+      // Find the last user message and resend it
+      const lastUserMessage = [...messages].reverse().find(msg => msg.sender === 'user');
+      if (lastUserMessage) {
+        setInput(lastUserMessage.text);
+        // Use a small timeout to ensure the UI updates before sending
+        setTimeout(() => {
+          handleSend();
+        }, 100);
+      }
     }
   };
 
@@ -132,7 +153,7 @@ const AIChatbot: React.FC = () => {
                 onClick={handleRetry}
                 className="ml-2 flex items-center"
               >
-                <RefreshCw className="h-4 w-4 mr-1" /> Retry
+                <RefreshCw className="h-4 w-4 mr-1" /> Retry {retryCount > 0 ? `(${retryCount})` : ''}
               </Button>
             </Alert>
           )}
