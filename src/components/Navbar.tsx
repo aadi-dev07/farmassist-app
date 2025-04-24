@@ -1,11 +1,12 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Leaf, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/clerk-react";
 
 const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isSignedIn } = useAuth();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -38,10 +39,21 @@ const Navbar: React.FC = () => {
           </Link>
         </div>
 
-        <div className="hidden md:block">
-          <Button variant="default" className="bg-farm-green-600 hover:bg-farm-green-700">
-            Sign In
-          </Button>
+        <div className="hidden md:flex md:items-center md:gap-4">
+          {isSignedIn ? (
+            <UserButton afterSignOutUrl="/" />
+          ) : (
+            <>
+              <SignInButton mode="modal">
+                <Button variant="outline">Sign In</Button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button variant="default" className="bg-farm-green-600 hover:bg-farm-green-700">
+                  Sign Up
+                </Button>
+              </SignUpButton>
+            </>
+          )}
         </div>
 
         {/* Mobile Navigation Toggle */}
@@ -97,9 +109,22 @@ const Navbar: React.FC = () => {
             >
               Community
             </Link>
-            <Button variant="default" className="mt-4 bg-farm-green-600 hover:bg-farm-green-700">
-              Sign In
-            </Button>
+            {isSignedIn ? (
+              <div className="mt-4">
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            ) : (
+              <div className="mt-4 flex flex-col gap-2">
+                <SignInButton mode="modal">
+                  <Button variant="outline" className="w-full">Sign In</Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button variant="default" className="w-full bg-farm-green-600 hover:bg-farm-green-700">
+                    Sign Up
+                  </Button>
+                </SignUpButton>
+              </div>
+            )}
           </div>
         </div>
       )}
