@@ -8,6 +8,7 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -16,8 +17,19 @@ serve(async (req) => {
     const { message } = await req.json()
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
     
-    // Use Gemini Pro 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    // Use Gemini Pro 1.5 
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-pro",
+      systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include:​
+
+Plant Disease Diagnosis: Analyze images of plant leaves to identify potential diseases and suggest treatments.
+
+Farming Advice: Provide guidance on plant care, fertilizers, weather impacts, and sustainable practices.
+
+Community Engagement: Facilitate connections between users, experts, and fellow farmers for shared knowledge.
+
+Real-Time Alerts: Inform users about local disease outbreaks and weather changes.`
+    })
 
     const chat = model.startChat({
       history: [
