@@ -1,15 +1,17 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Send, User } from 'lucide-react';
+import { toast } from '@/components/ui/sonner';
 
 interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
 }
+
+const N8N_WEBHOOK_URL = 'https://agentmart.app.n8n.cloud/webhook-test/farmsist';
 
 const AIChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -22,7 +24,7 @@ const AIChatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     // Add user message
@@ -36,34 +38,41 @@ const AIChatbot: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponses: { [key: string]: string } = {
-        tomato: "Tomatoes need full sun and well-draining soil. Water consistently and provide support as they grow. Watch for signs of early blight or leaf spot.",
-        water: "Most plants need 1-2 inches of water per week. It's better to water deeply and infrequently than shallowly and often. Morning watering is ideal to reduce disease risk.",
-        fertilizer: "Choose fertilizers based on your plants' needs. Generally, nitrogen promotes leaf growth, phosphorus supports root and flower development, and potassium improves overall plant health.",
-        pest: "Integrated Pest Management (IPM) is best: start with prevention, then use physical barriers, beneficial insects, and as a last resort, organic or chemical pesticides appropriate for your specific pest.",
-      };
-
-      const userQuery = input.toLowerCase();
-      let responseText = "I don't have specific information about that, but I'd be happy to help you with questions about planting times, pest control, watering schedules, or disease management.";
-
-      // Check for keywords in the user's message
-      Object.keys(botResponses).forEach(keyword => {
-        if (userQuery.includes(keyword)) {
-          responseText = botResponses[keyword];
-        }
+    try {
+      const response = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: input,
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to get response from FarmAssist AI');
+      }
+
+      const data = await response.json();
+      const botResponse = data.response || "I apologize, but I'm having trouble understanding. Could you rephrase your question about farming?";
+
       const botMessage: Message = {
-        text: responseText,
+        text: botResponse,
         sender: 'bot',
         timestamp: new Date()
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
+    } catch (error) {
+      console.error('Error in FarmAssist AI chat:', error);
+      toast({
+        title: "Error",
+        description: "Unable to get a response. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
