@@ -3,9 +3,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, User } from 'lucide-react';
+import { MessageSquare, Send, User, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Message {
   text: string;
@@ -23,6 +24,7 @@ const AIChatbot: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +35,7 @@ const AIChatbot: React.FC = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    setError(null);
 
     // Add user message
     const userMessage: Message = {
@@ -46,7 +49,7 @@ const AIChatbot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      console.log('Sending message to chat-assistant function');
+      console.log('Sending message to chat-assistant function:', input);
       const { data, error } = await supabase.functions.invoke('chat-assistant', {
         body: { message: input }
       });
@@ -72,6 +75,7 @@ const AIChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
       console.error('Error details:', error);
+      setError('Failed to get response from AI assistant. Please try again.');
       toast({
         title: "Error",
         description: "Failed to get response from AI assistant. Please try again.",
@@ -101,6 +105,13 @@ const AIChatbot: React.FC = () => {
         </div>
 
         <div className="max-w-3xl mx-auto">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <Card className="border-2">
             <CardHeader className="bg-farm-green-200 border-b">
               <CardTitle className="flex items-center">

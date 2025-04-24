@@ -17,48 +17,58 @@ serve(async (req) => {
     const { message } = await req.json()
     console.log("Received message:", message)
     
+    if (!message || typeof message !== 'string' || message.trim() === '') {
+      console.error("Invalid message received:", message)
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid message format", 
+          details: "Message must be a non-empty string" 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        },
+      )
+    }
+
     // Initialize the Google Generative AI client
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!)
+    const apiKey = Deno.env.get('GEMINI_API_KEY')
+    if (!apiKey) {
+      console.error("Missing GEMINI_API_KEY environment variable")
+      return new Response(
+        JSON.stringify({ 
+          error: "Configuration error", 
+          details: "API key not configured"
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500 
+        },
+      )
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey)
     console.log("Initialized Google Generative AI client")
     
-    // Try using gemini-1.0-pro model instead
-    // The error suggests that gemini-pro might not be available or has issues
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.0-pro",  // Updated model name
-      systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include:​
-
-Plant Disease Diagnosis: Analyze images of plant leaves to identify potential diseases and suggest treatments.
-
-Farming Advice: Provide guidance on plant care, fertilizers, weather impacts, and sustainable practices.
-
-Community Engagement: Facilitate connections between users, experts, and fellow farmers for shared knowledge.
-
-Real-Time Alerts: Inform users about local disease outbreaks and weather changes.`
-    })
-    console.log("Created model with system instruction")
-
-    const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: "Hi, I need help with farming and gardening.",
-        },
-        {
-          role: "model",
-          parts: "Hello! I'm FarmAssist, your AI agricultural assistant. I'm here to help you with plant care, disease diagnosis, and sustainable farming practices. What specific farming or gardening questions do you have?",
-        },
-      ],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7,
-      },
-    })
-    console.log("Started chat with history")
-
-    console.log("Sending message to Gemini API:", message)
+    // First try direct content generation instead of chat
     try {
-      const result = await chat.sendMessage(message)
-      console.log("Received response from Gemini API")
+      console.log("Attempting direct content generation with gemini-1.0-pro")
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.0-pro"
+      })
+      
+      const result = await model.generateContent(
+        [
+          {
+            role: "user",
+            parts: [
+              { text: "You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts. The user asks: " + message }
+            ]
+          }
+        ]
+      )
+      
+      console.log("Received direct generation response")
       const response = await result.response
       const text = response.text()
       console.log("Response text sample:", text.substring(0, 100) + "...")
@@ -69,26 +79,65 @@ Real-Time Alerts: Inform users about local disease outbreaks and weather changes
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       )
-    } catch (sendError) {
-      console.error("Error sending message:", sendError.message, sendError.stack)
+    } catch (directGenError) {
+      console.error("Direct generation error:", directGenError.message, directGenError.stack)
+      console.log("Falling back to chat model...")
       
-      // If the specific model fails, try a fallback model
-      console.log("Attempting with fallback model gemini-1.0-pro-latest")
-      const fallbackModel = genAI.getGenerativeModel({ 
-        model: "gemini-1.0-pro-latest",
-        systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant care advice, disease diagnosis, and sustainable farming practices.`
-      })
-      
-      const fallbackResult = await fallbackModel.generateContent(message)
-      const fallbackText = await fallbackResult.response.text()
-      console.log("Fallback response sample:", fallbackText.substring(0, 100) + "...")
-      
-      return new Response(
-        JSON.stringify({ response: fallbackText }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
+      try {
+        // Try the chat model as a fallback
+        const chatModel = genAI.getGenerativeModel({ 
+          model: "gemini-pro",  // Try the original model name
+          systemInstruction: `You are FarmAssist, an AI-powered agricultural assistant designed to support farmers and gardening enthusiasts. Your primary functions include plant disease diagnosis, farming advice, community engagement, and real-time alerts.`
+        })
+        
+        console.log("Starting simple chat with gemini-pro model")
+        
+        const result = await chatModel.generateContent(
+          [
+            {
+              role: "user",
+              parts: [{ text: message }]
+            }
+          ]
+        )
+        
+        const response = await result.response
+        const text = response.text()
+        console.log("Chat response text sample:", text.substring(0, 100) + "...")
+  
+        return new Response(
+          JSON.stringify({ response: text }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      } catch (chatError) {
+        console.error("Chat model error:", chatError.message, chatError.stack)
+        
+        // Final fallback using the generative model without special parameters
+        try {
+          console.log("Attempting basic fallback with gemini-1.0-pro-latest")
+          const fallbackModel = genAI.getGenerativeModel({ 
+            model: "gemini-1.0-pro-latest",
+          })
+          
+          const prompt = `Answer as FarmAssist, an AI agricultural assistant. Be helpful and provide farming advice. Question: ${message}`
+          
+          const fallbackResult = await fallbackModel.generateContent(prompt)
+          const fallbackText = await fallbackResult.response.text()
+          console.log("Basic fallback response sample:", fallbackText.substring(0, 100) + "...")
+          
+          return new Response(
+            JSON.stringify({ response: fallbackText }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        } catch (finalError) {
+          console.error("All attempts failed. Final error:", finalError.message)
+          throw finalError // Pass to the outer catch block
+        }
+      }
     }
   } catch (error) {
     console.error('Critical error:', error.message, error.stack)
