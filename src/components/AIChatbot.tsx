@@ -1,12 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, User, AlertCircle, RefreshCw } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { MessageSquare, Send, User } from 'lucide-react';
 
 interface Message {
   text: string;
@@ -17,36 +14,16 @@ interface Message {
 const AIChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
-      text: "Hello! I'm FarmAssist, your AI agricultural assistant. I'm here to help you with plant care, disease diagnosis, and sustainable farming practices. What questions do you have?",
+      text: "Hello! I'm your FarmAssist AI. Ask me anything about farming, gardening, plant care, or disease management.",
       sender: 'bot',
       timestamp: new Date()
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const lastUserMessageRef = useRef<string | null>(null);
-  const maxRetries = 3;
 
-  // Auto-scroll to the bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!input.trim()) return;
-    setError(null);
-
-    // Store user message for potential retries
-    lastUserMessageRef.current = input;
 
     // Add user message
     const userMessage: Message = {
@@ -59,82 +36,39 @@ const AIChatbot: React.FC = () => {
     setInput('');
     setIsLoading(true);
 
-    try {
-      console.log('Sending message to chat-assistant function:', input);
-      const { data, error: functionError } = await supabase.functions.invoke('chat-assistant', {
-        body: { message: input }
+    // Simulate AI response
+    setTimeout(() => {
+      const botResponses: { [key: string]: string } = {
+        tomato: "Tomatoes need full sun and well-draining soil. Water consistently and provide support as they grow. Watch for signs of early blight or leaf spot.",
+        water: "Most plants need 1-2 inches of water per week. It's better to water deeply and infrequently than shallowly and often. Morning watering is ideal to reduce disease risk.",
+        fertilizer: "Choose fertilizers based on your plants' needs. Generally, nitrogen promotes leaf growth, phosphorus supports root and flower development, and potassium improves overall plant health.",
+        pest: "Integrated Pest Management (IPM) is best: start with prevention, then use physical barriers, beneficial insects, and as a last resort, organic or chemical pesticides appropriate for your specific pest.",
+      };
+
+      const userQuery = input.toLowerCase();
+      let responseText = "I don't have specific information about that, but I'd be happy to help you with questions about planting times, pest control, watering schedules, or disease management.";
+
+      // Check for keywords in the user's message
+      Object.keys(botResponses).forEach(keyword => {
+        if (userQuery.includes(keyword)) {
+          responseText = botResponses[keyword];
+        }
       });
 
-      console.log('Response received:', data, 'Error:', functionError);
-
-      if (functionError) {
-        console.error('Supabase function error:', functionError);
-        throw new Error(`Function error: ${functionError.message || 'Unknown error'}`);
-      }
-
-      if (!data || !data.response) {
-        console.error('Invalid response format:', data);
-        throw new Error('Invalid response from AI assistant');
-      }
-
       const botMessage: Message = {
-        text: data.response,
+        text: responseText,
         sender: 'bot',
         timestamp: new Date()
       };
 
       setMessages(prevMessages => [...prevMessages, botMessage]);
-      setRetryCount(0); // Reset retry count on success
-      scrollToBottom();
-    } catch (error) {
-      console.error('Error details:', error);
-      setError('Failed to get response from AI assistant. Please try again.');
-      toast({
-        title: "Error",
-        description: "Failed to get response from AI assistant. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSend();
-    }
-  };
-
-  const handleRetry = async () => {
-    if (retryCount >= maxRetries) {
-      toast({
-        title: "Maximum Retries Reached",
-        description: "Please try a different question or try again later.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setError(null);
-    // Increment retry count
-    setRetryCount(prev => prev + 1);
-    
-    if (lastUserMessageRef.current) {
-      setInput(lastUserMessageRef.current);
-      // Use a small timeout to ensure the UI updates before sending
-      setTimeout(() => {
-        handleSend();
-      }, 100);
-    } else {
-      // Find the last user message and resend it
-      const lastUserMessage = [...messages].reverse().find(msg => msg.sender === 'user');
-      if (lastUserMessage) {
-        setInput(lastUserMessage.text);
-        // Use a small timeout to ensure the UI updates before sending
-        setTimeout(() => {
-          handleSend();
-        }, 100);
-      }
     }
   };
 
@@ -151,25 +85,6 @@ const AIChatbot: React.FC = () => {
         </div>
 
         <div className="max-w-3xl mx-auto">
-          {error && (
-            <Alert variant="destructive" className="mb-4 flex justify-between items-center">
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <AlertDescription>{error}</AlertDescription>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleRetry}
-                className="ml-2 flex items-center"
-                disabled={isLoading || retryCount >= maxRetries}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} /> 
-                Retry {retryCount > 0 ? `(${retryCount}/${maxRetries})` : ''}
-              </Button>
-            </Alert>
-          )}
-          
           <Card className="border-2">
             <CardHeader className="bg-farm-green-200 border-b">
               <CardTitle className="flex items-center">
@@ -178,10 +93,7 @@ const AIChatbot: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div 
-                ref={chatContainerRef}
-                className="h-[400px] overflow-y-auto p-4 flex flex-col space-y-4"
-              >
+              <div className="h-[400px] overflow-y-auto p-4 flex flex-col space-y-4">
                 {messages.map((message, index) => (
                   <div
                     key={index}
@@ -206,7 +118,7 @@ const AIChatbot: React.FC = () => {
                           {message.sender === 'user' ? 'You' : 'FarmAssist AI'}
                         </span>
                       </div>
-                      <p className="whitespace-pre-line">{message.text}</p>
+                      <p>{message.text}</p>
                       <p className="text-xs opacity-70 text-right mt-1">
                         {message.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
@@ -227,13 +139,12 @@ const AIChatbot: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
               </div>
               <div className="border-t p-4 flex space-x-2">
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about farming, gardening, or plant care..."
+                  placeholder="Ask something about farming..."
                   onKeyPress={handleKeyPress}
                   disabled={isLoading}
                   className="flex-1"
