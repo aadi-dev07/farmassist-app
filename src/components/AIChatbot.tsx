@@ -66,10 +66,8 @@ const AIChatbot: React.FC = () => {
       setMessages(prevMessages => [...prevMessages, botMessage]);
     } catch (error) {
       console.error('Error in FarmAssist AI chat:', error);
-      // Fixed toast call to match the expected API
       toast("Unable to get a response. Please try again.", {
-        description: "There was an error connecting to FarmAssist AI.",
-        variant: "destructive",
+        description: "There was an error connecting to FarmAssist AI."
       });
     } finally {
       setIsLoading(false);
@@ -118,18 +116,20 @@ const AIChatbot: React.FC = () => {
                           : 'bg-farm-green-100 border border-farm-green-200'
                       }`}
                     >
-                      <div className="flex items-center mb-1">
+                      <div className="flex items-center gap-1 mb-2">
                         {message.sender === 'user' ? (
-                          <User className="h-4 w-4 mr-1" />
+                          <User className="h-4 w-4" />
                         ) : (
-                          <MessageSquare className="h-4 w-4 mr-1" />
+                          <MessageSquare className="h-4 w-4" />
                         )}
-                        <span className="text-xs font-medium">
+                        <span className="text-xs font-semibold">
                           {message.sender === 'user' ? 'You' : 'FarmAssist AI'}
                         </span>
                       </div>
-                      <p>{message.text}</p>
-                      <p className="text-xs opacity-70 text-right mt-1">
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                        {message.text}
+                      </p>
+                      <p className="text-xs opacity-70 text-right mt-2">
                         {message.timestamp.toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit'
